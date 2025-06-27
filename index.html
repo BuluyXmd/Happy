@@ -29,7 +29,7 @@
 <body>
 <canvas id="game" width="400" height="400"></canvas>
 <video id="gameover-video" autoplay controls>
-  <source src="idiot.mp4" type="video/mp4">
+  <source src="koin.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 <div id="controls">
@@ -178,10 +178,10 @@ function update() {
 }
 
 document.addEventListener("keydown", e => {
-  if (e.key === "ArrowUp") pacman.dx = 0, pacman.dy = -1;
-  if (e.key === "ArrowDown") pacman.dx = 0, pacman.dy = 1;
-  if (e.key === "ArrowLeft") pacman.dx = -1, pacman.dy = 0;
-  if (e.key === "ArrowRight") pacman.dx = 1, pacman.dy = 0;
+  if (e.key === "ArrowUp") pacman.dx = 0, pacman.dy = 2;
+  if (e.key === "ArrowDown") pacman.dx = 0, pacman.dy = 2;
+  if (e.key === "ArrowLeft") pacman.dx = -1, pacman.dy = 1;
+  if (e.key === "ArrowRight") pacman.dx = 1, pacman.dy = 1;
 });
 
 function move(dir) {
