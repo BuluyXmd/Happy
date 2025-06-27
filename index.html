@@ -1,121 +1,201 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>web Sederhana</title>
+  <meta charset="UTF-8">
+  <title>Pac-Man Hardcore</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: white;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    body { margin: 0; background: black; }
+    canvas { display: block; margin: auto; background: black; }
+    #controls {
+      position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; gap: 5px;
     }
-    h1 {
-      margin-top: 20px;
-    }
-    #videoContainer {
-      margin-top: 20px;
-      width: 90%;
-      max-width: 500px;
-      border: 1px solid #333;
-      border-radius: 10px;
-      padding: 10px;
-      background-color: #222;
-    }
-    video {
-      width: 100%;
-      border-radius: 10px;
-    }
-    .comment-section {
-      margin-top: 10px;
-    }
-    .comment {
-      background: #333;
-      padding: 5px;
-      margin: 5px 0;
-      border-radius: 5px;
-    }
-    input[type="text"] {
-      width: 80%;
-      padding: 8px;
-      margin-top: 5px;
-      border: none;
-      border-radius: 5px;
-    }
+    .row { display: flex; justify-content: center; gap: 10px; }
     button {
-      padding: 8px 12px;
-      margin-top: 5px;
-      background: #ff2d55;
-      color: white;
-      border: none;
-      border-radius: 5px;
+      width: 50px; height: 50px; font-size: 18px;
+      background: #444; color: white; border-radius: 5px;
     }
-    #uploadForm {
-      margin-top: 20px;
+    #gameover-video {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 999;
+      width: 80vw;
     }
   </style>
 </head>
 <body>
-  <h1>web</h1>
+<canvas id="game" width="400" height="400"></canvas>
+<video id="gameover-video" autoplay controls>
+  <source src="idiot.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+<div id="controls">
+  <div class="row"><button onclick="move('up')">⬆️</button></div>
+  <div class="row">
+    <button onclick="move('left')">⬅️</button>
+    <button onclick="move('down')">⬇️</button>
+    <button onclick="move('right')">➡️</button>
+  </div>
+</div>
+<audio id="eat-sound" src="koin.mp3"></audio>
+<audio id="death-sound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_01e7928272.mp3?filename=error-126627.mp3"></audio>
+<audio id="bg-music" src="https://cdn.pixabay.com/download/audio/2022/06/07/audio_f479963a89.mp3?filename=8-bit-funk-112972.mp3" loop autoplay></audio>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const eatSound = document.getElementById("eat-sound");
+const deathSound = document.getElementById("death-sound");
+const bgMusic = document.getElementById("bg-music");
+const gameoverVideo = document.getElementById("gameover-video");
 
-  <form id="uploadForm">
-    <input type="file" id="videoInput" accept="video/*" required />
-    <button type="submit">Upload Video</button>
-  </form>
+const tileSize = 20;
+const map = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,1],
+  [1,0,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,0,1],
+  [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,1],
+  [1,0,1,0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1],
+  [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+  [1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1],
+  [1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+  [1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+  [1,0,1,0,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1],
+  [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+  [1,1,1,0,1,0,1,1,1,1,1,1,1,1,0,1,0,1,1,1],
+  [1,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+];
 
-  <div id="videoContainer"></div>
+let pacman = { x: 1, y: 1, dx: 0, dy: 0 };
+let ghosts = [
+  { x: 18, y: 13, color: 'red' },
+  { x: 1, y: 13, color: 'cyan' },
+  { x: 18, y: 1, color: 'pink' },
+  { x: 10, y: 7, color: 'orange' },
+  { x: 9, y: 1, color: 'purple' }
+];
+let food = [];
+let score = 0;
+let lives = 3;
+let gameOver = false;
 
-  <script>
-    const form = document.getElementById("uploadForm");
-    const videoContainer = document.getElementById("videoContainer");
-
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const file = document.getElementById("videoInput").files[0];
-      if (!file) return;
-
-      const url = URL.createObjectURL(file);
-      addVideo(url);
-    });
-
-    function addVideo(src) {
-      const videoBox = document.createElement("div");
-
-      videoBox.innerHTML = `
-        <video controls>
-          <source src="${src}" type="video/mp4">
-          Browser kamu tidak mendukung video.
-        </video>
-        <div class="comment-section">
-          <h3>Komentar</h3>
-          <div class="comments"></div>
-          <input type="text" placeholder="Tulis komentar..." />
-          <button class="commentBtn">Kirim</button>
-        </div>
-      `;
-
-      const commentBtn = videoBox.querySelector(".commentBtn");
-      const commentInput = videoBox.querySelector("input[type='text']");
-      const commentsDiv = videoBox.querySelector(".comments");
-
-      commentBtn.addEventListener("click", () => {
-        const comment = commentInput.value.trim();
-        if (comment) {
-          const p = document.createElement("div");
-          p.className = "comment";
-          p.textContent = comment;
-          commentsDiv.appendChild(p);
-          commentInput.value = "";
-        }
-      });
-
-      videoContainer.prepend(videoBox);
+function init() {
+  food = [];
+  for (let y = 0; y < map.length; y++) {
+    for (let x = 0; x < map[0].length; x++) {
+      if (map[y][x] === 0 && !(x === pacman.x && y === pacman.y)) {
+        food.push({ x, y });
+      }
     }
-  </script>
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < map.length; y++) {
+    for (let x = 0; x < map[0].length; x++) {
+      if (map[y][x] === 1) {
+        ctx.fillStyle = "#0033cc";
+        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+      }
+    }
+  }
+  ctx.fillStyle = "white";
+  food.forEach(f => {
+    ctx.beginPath();
+    ctx.arc(f.x * tileSize + tileSize / 2, f.y * tileSize + tileSize / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = "yellow";
+  ctx.beginPath();
+  ctx.arc(pacman.x * tileSize + tileSize / 2, pacman.y * tileSize + tileSize / 2, tileSize / 2 - 2, 0.2 * Math.PI, 1.8 * Math.PI);
+  ctx.lineTo(pacman.x * tileSize + tileSize / 2, pacman.y * tileSize + tileSize / 2);
+  ctx.fill();
+  ghosts.forEach(g => {
+    ctx.fillStyle = g.color;
+    ctx.beginPath();
+    ctx.arc(g.x * tileSize + tileSize / 2, g.y * tileSize + tileSize / 2, tileSize / 2 - 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = "white";
+  ctx.font = "14px Arial";
+  ctx.fillText("Score: " + score + " | Lives: " + lives, 10, canvas.height - 10);
+}
+
+function update() {
+  if (gameOver) return;
+  let nx = pacman.x + pacman.dx;
+  let ny = pacman.y + pacman.dy;
+  if (map[ny] && map[ny][nx] === 0) {
+    pacman.x = nx;
+    pacman.y = ny;
+  }
+  for (let i = 0; i < food.length; i++) {
+    if (food[i].x === pacman.x && food[i].y === pacman.y) {
+      food.splice(i, 1);
+      score++;
+      eatSound.play();
+      break;
+    }
+  }
+  ghosts.forEach(g => {
+    if (pacman.x === g.x && pacman.y === g.y) {
+      lives--;
+      deathSound.play();
+      if (lives === 0) {
+        gameOver = true;
+        bgMusic.pause();
+        canvas.style.display = 'none';
+        gameoverVideo.style.display = 'block';
+        gameoverVideo.play();
+        return;
+      } else {
+        pacman = { x: 1, y: 1, dx: 0, dy: 0 };
+      }
+    }
+    let dirs = [
+      { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
+    ];
+    let best = dirs[0], minDist = Infinity;
+    dirs.forEach(d => {
+      let gx = g.x + d.dx;
+      let gy = g.y + d.dy;
+      if (map[gy] && map[gy][gx] === 0) {
+        let dist = Math.abs(pacman.x - gx) + Math.abs(pacman.y - gy);
+        if (dist < minDist) {
+          minDist = dist;
+          best = d;
+        }
+      }
+    });
+    g.x += best.dx;
+    g.y += best.dy;
+  });
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") pacman.dx = 0, pacman.dy = -1;
+  if (e.key === "ArrowDown") pacman.dx = 0, pacman.dy = 1;
+  if (e.key === "ArrowLeft") pacman.dx = -1, pacman.dy = 0;
+  if (e.key === "ArrowRight") pacman.dx = 1, pacman.dy = 0;
+});
+
+function move(dir) {
+  if (dir === "up") pacman.dx = 0, pacman.dy = -1;
+  if (dir === "down") pacman.dx = 0, pacman.dy = 1;
+  if (dir === "left") pacman.dx = -1, pacman.dy = 0;
+  if (dir === "right") pacman.dx = 1, pacman.dy = 0;
+}
+
+init();
+setInterval(() => {
+  update();
+  draw();
+}, 200);
+</script>
 </body>
-</html>.
+</html>
